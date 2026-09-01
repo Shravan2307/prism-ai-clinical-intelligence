@@ -98,12 +98,32 @@ export class ClinicalApiError extends Error {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
+
+export async function checkApiHealth(signal?: AbortSignal): Promise<boolean> {
+  try {
+    const url = API_BASE_URL ? `${API_BASE_URL}/api/health` : `/api/health`;
+    const response = await fetch(url, { signal });
+    if (response.ok) return true;
+    
+    // Fallback to /health if /api/health returned non-ok
+    const fallbackUrl = API_BASE_URL ? `${API_BASE_URL}/health` : `/health`;
+    const fallbackResponse = await fetch(fallbackUrl, { signal });
+    return fallbackResponse.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function analyzePatient(
   patient: PatientRequest,
   signal?: AbortSignal,
 ): Promise<ClinicalAnalysisResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/patient/analyze`, {
+    const url = API_BASE_URL ? `${API_BASE_URL}/api/patient/analyze` : `/api/patient/analyze`;
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patient),
