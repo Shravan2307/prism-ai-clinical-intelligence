@@ -9,10 +9,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+import warnings
 
 import numpy as np
 import pandas as pd
-import shap
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message=r"The set_(bad|over|under) function will be deprecated.*",
+        category=PendingDeprecationWarning,
+    )
+    import shap
 
 from .causal_data import TREATMENTS, encode_patient_features
 from .causal_engine import CausalTreatmentEffectEngine
