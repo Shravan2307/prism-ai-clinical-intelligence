@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -17,7 +17,13 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { analyzePatient, ClinicalAnalysisResponse, ClinicalApiError, PatientRequest } from "@/api/clinicalAnalysis";
+import {
+  analyzePatient,
+  checkApiHealth,
+  ClinicalAnalysisResponse,
+  ClinicalApiError,
+  PatientRequest,
+} from "@/api/clinicalAnalysis";
 
 const LOGO_URL = "/prism-signal-logo.png";
 
@@ -171,17 +177,41 @@ export default function Home() {
   const [result, setResult] = useState<ClinicalAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    checkApiHealth().then((connected) => {
+      if (active) setApiConnected(connected);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setLoading(true);
-    try { setResult(await analyzePatient(form)); } catch (err) {
-      if (err instanceof ClinicalApiError) setError(err.message);
-      else setError("Unable to connect to the clinical analysis service.");
-    } finally { setLoading(false); }
+    try {
+      setResult(await analyzePatient(form));
+      setApiConnected(true);
+    } catch (err) {
+      if (err instanceof ClinicalApiError) {
+        setError(err.message);
+        if (err.status === null) setApiConnected(false);
+      } else {
+        setError("Unable to connect to the clinical analysis service.");
+        setApiConnected(false);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const reset = () => { setResult(null); setError(""); };
+  const reset = () => {
+    setResult(null);
+    setError("");
+  };
   return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark"><img src={LOGO_URL} alt="Prism signal mark" /><span className="brand-signal-edge" /></div><div><strong>PRISM</strong><span>Clinical intelligence</span></div></div><nav><a className="nav-link active" href="#analysis"><Activity size={17} /> <span>Patient analysis</span><span className="nav-pulse" /></a><a className="nav-link" href="#workflow" onClick={(e) => e.preventDefault()}><ClipboardCheck size={17} /> <span>Doctor workflow</span><small>API</small></a></nav><div className="sidebar-bottom"><div className="system-status"><span className="online-dot" /> <span>Clinical API connected</span></div><p>Prototype workspace<br />Synthetic data only</p></div></aside><main className="main-canvas" id="analysis"><header className="topbar"><div><p className="eyebrow">Care navigation workspace</p><h1>{result ? "Clinical signal review" : "Patient analysis"}</h1></div><div className="topbar-meta"><span><LockKeyhole size={14} /> Privacy-aware session</span><span className="date-stamp">Live session / 01</span></div></header>{loading ? <LoadingPanel /> : result ? <ResultDashboard result={result} onReset={reset} /> : <div className="intake-layout"><div className="intake-primary"><div className="intro-block"><div className="intro-kicker"><span className="signal-line" /> EARLY SIGNAL DETECTION</div><h2>Make the next<br /><i>clinical move</i> clearer.</h2><p>Connect patient measurements to a transparent, safety-gated care pathway. Start with the data you have.</p></div><PatientForm form={form} setForm={setForm} onSubmit={submit} loading={loading} error={error} /></div><aside className="intake-aside"><div className="aside-illustration"><div className="radar-ring ring-one" /><div className="radar-ring ring-two" /><div className="radar-core"><HeartPulse size={28} /></div><span className="radar-label label-one">SAFETY</span><span className="radar-label label-two">SIGNAL</span><span className="radar-label label-three">REVIEW</span></div><div className="aside-note"><div className="workflow-heading"><span className="workflow-signal" /><p className="eyebrow teal">Workflow telemetry</p></div><div className="mini-step"><span>01</span><div><strong>Input received</strong><p>Patient information enters the validation boundary.</p></div></div><div className="mini-step"><span>02</span><div><strong>Safety boundary</strong><p>Risk, triage, and urgency remain backend-owned.</p></div></div><div className="mini-step"><span>03</span><div><strong>Handoff readiness</strong><p>Cases and reports appear when review is required.</p></div></div></div></aside></div>}<footer className="global-footer">AI-assisted clinical intelligence <span>•</span> Analysis for qualified professional review</footer></main></div>;
 }
